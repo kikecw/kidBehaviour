@@ -6,18 +6,18 @@
   <meta name="theme-color" content="#f4f4f1" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="Tarjetas" />
-  <title>Tarjetas</title>
+  <meta name="apple-mobile-web-app-title" content="KidBehaviour" />
+  <title>KidBehaviour</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="icon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="icon" href="apple-touch-icon.png" type="image/png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="settings.css" />
 </head>
 <body>
   <div id="app"></div>
   <script src="app.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'));
-  </script>
+  <script src="settings.js"></script>
+  <script>if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js'));</script>
 </body>
 </html>
