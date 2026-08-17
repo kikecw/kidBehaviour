@@ -1,8 +1,9 @@
 const SUPABASE_URL='https://lyhtapcdtlfsbfsinugb.supabase.co';
 const SUPABASE_KEY='sb_publishable_w11bXI29syCiMeDNF2N2_g_E_Q1XQa6';
 const FAMILY_NAME='Carcamo R-Roda';
+const APP_URL='https://kikecw.github.io/kidBehaviour/';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-let cloud={session:null,family:null,role:null,ready:false,syncing:false,channel:null,lastRemoteVersion:0};
+let cloud={session:null,family:null,role:null,ready:false,syncing:false,channel:null,lastRemoteVersion:0,lastSnapshot:''};
 
 function authScreen(message=''){
   document.getElementById('app').innerHTML=`<main class="auth-shell"><section class="auth-card"><div class="auth-logo">👧 🟦 👦</div><h1>KidBehaviour</h1><p class="auth-sub">Familia <strong>${FAMILY_NAME}</strong></p>${message?`<div class="auth-message">${escapeHtml(message)}</div>`:''}<label>Email<input id="authEmail" type="email" autocomplete="email" placeholder="tu@email.com"></label><label>Contraseña<input id="authPassword" type="password" autocomplete="current-password" minlength="6" placeholder="Mínimo 6 caracteres"></label><button class="primary" data-login>Entrar</button><button class="secondary" data-signup>Crear cuenta</button><p class="auth-help">Tus datos se sincronizarán de forma privada entre los adultos de la familia.</p></section></main>`;
@@ -12,12 +13,13 @@ function authScreen(message=''){
 async function authAction(kind){
   const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value;
   if(!email||password.length<6){authScreen('Escribe un email y una contraseña de al menos 6 caracteres.');return}
-  const result=kind==='signup'?await sb.auth.signUp({email,password}):await sb.auth.signInWithPassword({email,password});
+  const result=kind==='signup'?await sb.auth.signUp({email,password,options:{emailRedirectTo:APP_URL}}):await sb.auth.signInWithPassword({email,password});
   if(result.error){authScreen(result.error.message);return}
   if(kind==='signup'&&!result.data.session){authScreen('Cuenta creada. Revisa tu email para confirmarla y después pulsa Entrar.');return}
   await startCloud(result.data.session);
 }
 function localSnapshot(){return JSON.parse(JSON.stringify(state))}
+function snapshotString(){try{return JSON.stringify(state)}catch{return''}}
 async function startCloud(session){
   cloud.session=session;
   if(!session){cloud.ready=false;authScreen();return}
@@ -35,32 +37,29 @@ async function startCloud(session){
     const {data:fam,error:fe}=await sb.from('families').select('id,name').eq('id',member.family_id).single();if(fe)throw fe;cloud.family=fam;
     const {data:remote,error:re}=await sb.from('family_state').select('state,version').eq('family_id',fam.id).single();if(re)throw re;
     if(remote?.state&&Object.keys(remote.state).length){state=remote.state;state.children=state.children?.length?state.children:CHILDREN;state.privileges=state.privileges?.length?state.privileges:PRIVILEGES;state.days||={};state.rewards||=[];state.restrictions||=[];localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(PRIVILEGE_SETTINGS_KEY,JSON.stringify(state.privileges));cloud.lastRemoteVersion=remote.version||1}
-    cloud.ready=true;subscribeFamily();render();
+    cloud.lastSnapshot=snapshotString();cloud.ready=true;subscribeFamily();render();
   }catch(e){console.error(e);authScreen(`No se pudo preparar la sincronización: ${e.message}`)}
 }
 async function pushCloudState(){
   if(!cloud.ready||cloud.syncing||!cloud.family||!cloud.session)return;
   cloud.syncing=true;
-  try{const {data,error}=await sb.from('family_state').update({state:localSnapshot(),version:cloud.lastRemoteVersion+1,updated_at:new Date().toISOString(),updated_by:cloud.session.user.id}).eq('family_id',cloud.family.id).select('version').single();if(error)throw error;cloud.lastRemoteVersion=data.version}catch(e){console.error('Cloud save failed',e)}finally{cloud.syncing=false}
+  try{const snap=snapshotString();const {data,error}=await sb.from('family_state').update({state:localSnapshot(),version:cloud.lastRemoteVersion+1,updated_at:new Date().toISOString(),updated_by:cloud.session.user.id}).eq('family_id',cloud.family.id).select('version').single();if(error)throw error;cloud.lastRemoteVersion=data.version;cloud.lastSnapshot=snap}catch(e){console.error('Cloud save failed',e)}finally{cloud.syncing=false}
 }
 function subscribeFamily(){
   if(cloud.channel)sb.removeChannel(cloud.channel);
-  cloud.channel=sb.channel(`family:${cloud.family.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'family_state',filter:`family_id=eq.${cloud.family.id}`},payload=>{const row=payload.new;if(!row||row.updated_by===cloud.session.user.id||row.version<=cloud.lastRemoteVersion)return;cloud.lastRemoteVersion=row.version;state=row.state;state.children=state.children?.length?state.children:CHILDREN;state.privileges=state.privileges?.length?state.privileges:PRIVILEGES;state.days||={};state.rewards||=[];state.restrictions||=[];localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(PRIVILEGE_SETTINGS_KEY,JSON.stringify(state.privileges));render()}).subscribe();
+  cloud.channel=sb.channel(`family:${cloud.family.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'family_state',filter:`family_id=eq.${cloud.family.id}`},payload=>{const row=payload.new;if(!row||row.updated_by===cloud.session.user.id||row.version<=cloud.lastRemoteVersion)return;cloud.lastRemoteVersion=row.version;state=row.state;state.children=state.children?.length?state.children:CHILDREN;state.privileges=state.privileges?.length?state.privileges:PRIVILEGES;state.days||={};state.rewards||=[];state.restrictions||=[];localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(PRIVILEGE_SETTINGS_KEY,JSON.stringify(state.privileges));cloud.lastSnapshot=snapshotString();render()}).subscribe();
 }
 async function inviteAdult(email){
   if(cloud.role!=='admin')return {error:new Error('Solo un administrador puede invitar adultos.')};
-  return sb.from('invitations').upsert({family_id:cloud.family.id,email:email.trim().toLowerCase(),role:'adult',invited_by:cloud.session.user.id,accepted_at:null},{onConflict:'family_id,email'});
+  return sb.from('invitations').insert({family_id:cloud.family.id,email:email.trim().toLowerCase(),role:'adult',invited_by:cloud.session.user.id});
 }
-async function logoutCloud(){await sb.auth.signOut();cloud={session:null,family:null,role:null,ready:false,syncing:false,channel:null,lastRemoteVersion:0};authScreen()}
+async function logoutCloud(){await sb.auth.signOut();cloud={session:null,family:null,role:null,ready:false,syncing:false,channel:null,lastRemoteVersion:0,lastSnapshot:''};authScreen()}
 
-const localSave=save;
-save=function(){localSave();if(cloud.ready)pushCloudState()};
-const localSaveCustomPrivileges=saveCustomPrivileges;
-saveCustomPrivileges=function(){localSaveCustomPrivileges();if(cloud.ready)pushCloudState()};
+setInterval(()=>{if(!cloud.ready||cloud.syncing)return;const now=snapshotString();if(now&&now!==cloud.lastSnapshot)pushCloudState()},800);
 
 const cloudSettingsPage=settingsPage;
 settingsPage=function(){const base=cloudSettingsPage();if(!cloud.ready)return base;return `<section class="panel family-panel"><div class="family-title"><div><h2>Familia</h2><p>${escapeHtml(cloud.family.name)}</p></div><span class="role-pill">${cloud.role==='admin'?'Administrador':'Adulto'}</span></div><div class="setting-row"><span>👤 ${escapeHtml(cloud.session.user.email||'')}</span><strong>Conectado</strong></div>${cloud.role==='admin'?`<div class="invite-box"><label>Invitar a otro adulto<input id="inviteEmail" type="email" placeholder="email@ejemplo.com"></label><button class="secondary" data-invite>Enviar invitación</button><p>La otra persona crea su cuenta con ese mismo email y KidBehaviour la unirá automáticamente a esta familia.</p></div>`:''}<button class="danger" data-logout>Cerrar sesión</button></section>${base.replace('<p>Los datos se guardan solo en este dispositivo.</p>','<p>Los datos se guardan en este dispositivo y se sincronizan con la familia.</p>')}`};
 const cloudWire=wire;
-wire=function(){cloudWire();document.querySelector('[data-logout]')?.addEventListener('click',logoutCloud);document.querySelector('[data-invite]')?.addEventListener('click',async()=>{const email=document.getElementById('inviteEmail').value.trim();if(!email){alert('Escribe el email de la persona que quieres invitar.');return}const {error}=await inviteAdult(email);if(error){alert(error.message);return}ui.toast='Invitación preparada ✓';render();setTimeout(()=>{ui.toast=null;render()},1800)})};
+wire=function(){cloudWire();document.querySelector('[data-logout]')?.addEventListener('click',logoutCloud);document.querySelector('[data-invite]')?.addEventListener('click',async()=>{const email=document.getElementById('inviteEmail').value.trim();if(!email){alert('Escribe el email de la persona que quieres invitar.');return}const {error}=await inviteAdult(email);if(error){alert(error.code==='23505'?'Ese email ya está invitado.':error.message);return}ui.toast='Invitación preparada ✓';render();setTimeout(()=>{ui.toast=null;render()},1800)})};
 
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session)await startCloud(session);else authScreen();sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')authScreen();else if(event==='SIGNED_IN'&&session&&!cloud.ready)setTimeout(()=>startCloud(session),0)})})();
