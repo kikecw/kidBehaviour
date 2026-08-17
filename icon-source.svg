@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#ffffff"/>
+  <circle cx="175" cy="145" r="78" fill="#ffd2ad"/>
+  <circle cx="337" cy="145" r="78" fill="#ffd2ad"/>
+  <path d="M105 142c8-79 58-112 128-72 22 13 30 44 20 65-20-24-43-34-72-31-31 4-50 15-76 38z" fill="#754018"/>
+  <path d="M274 143c11-76 57-109 119-82 39 17 43 66 23 88-16-27-43-43-72-44-28 0-47 9-70 38z" fill="#754018"/>
+  <path d="M393 78c29-23 55-8 48 20-5 20-20 31-40 33" fill="none" stroke="#754018" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="148" cy="145" r="12" fill="#38200f"/><circle cx="203" cy="145" r="12" fill="#38200f"/>
+  <circle cx="311" cy="145" r="12" fill="#38200f"/><circle cx="366" cy="145" r="12" fill="#38200f"/>
+  <path d="M150 177q26 24 52 0" fill="none" stroke="#8c2f18" stroke-width="8" stroke-linecap="round"/>
+  <path d="M313 177q26 24 52 0" fill="none" stroke="#8c2f18" stroke-width="8" stroke-linecap="round"/>
+  <rect x="62" y="246" width="82" height="116" rx="18" fill="#f5f5f5" stroke="#dedede" stroke-width="6" transform="rotate(-9 103 304)"/>
+  <rect x="130" y="232" width="82" height="126" rx="18" fill="#1e88e5" stroke="#ffffff" stroke-width="6" transform="rotate(-3 171 295)"/>
+  <rect x="215" y="218" width="82" height="138" rx="18" fill="#ffbd1a" stroke="#ffffff" stroke-width="7"/>
+  <rect x="300" y="232" width="82" height="126" rx="18" fill="#ef3b2d" stroke="#ffffff" stroke-width="6" transform="rotate(3 341 295)"/>
+  <rect x="368" y="246" width="82" height="116" rx="18" fill="#222222" stroke="#ffffff" stroke-width="6" transform="rotate(9 409 304)"/>
+  <text x="103" y="314" text-anchor="middle" font-size="47">☆</text>
+  <text x="171" y="312" text-anchor="middle" font-size="44">☺</text>
+  <text x="256" y="307" text-anchor="middle" font-size="55">★</text>
+  <text x="341" y="312" text-anchor="middle" font-size="44">☹</text>
+  <text x="409" y="314" text-anchor="middle" font-size="45" fill="#ffffff">−</text>
+  <text x="256" y="425" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="800" fill="#182451">KidBehaviour</text>
+  <path d="M170 448q86 24 172 0" fill="none" stroke="#1887ea" stroke-width="10" stroke-linecap="round"/>
+</svg>
