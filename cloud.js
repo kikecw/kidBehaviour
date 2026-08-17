@@ -51,15 +51,20 @@ function subscribeFamily(){
 }
 async function inviteAdult(email){
   if(cloud.role!=='admin')return {error:new Error('Solo un administrador puede invitar adultos.')};
-  return sb.from('invitations').insert({family_id:cloud.family.id,email:email.trim().toLowerCase(),role:'adult',invited_by:cloud.session.user.id});
+  const clean=email.trim().toLowerCase();
+  const {data:existing,error:findError}=await sb.from('invitations').select('id').eq('family_id',cloud.family.id).eq('email',clean).is('accepted_at',null).limit(1);
+  if(findError)return {error:findError};
+  if(!existing?.length){const {error:insertError}=await sb.from('invitations').insert({family_id:cloud.family.id,email:clean,role:'adult',invited_by:cloud.session.user.id});if(insertError)return {error:insertError}}
+  const {error:mailError}=await sb.auth.signInWithOtp({email:clean,options:{emailRedirectTo:APP_URL,shouldCreateUser:true}});
+  return {error:mailError};
 }
 async function logoutCloud(){await sb.auth.signOut();cloud={session:null,family:null,role:null,ready:false,syncing:false,channel:null,lastRemoteVersion:0,lastSnapshot:''};authScreen()}
 
 setInterval(()=>{if(!cloud.ready||cloud.syncing)return;const now=snapshotString();if(now&&now!==cloud.lastSnapshot)pushCloudState()},800);
 
 const cloudSettingsPage=settingsPage;
-settingsPage=function(){const base=cloudSettingsPage();if(!cloud.ready)return base;return `<section class="panel family-panel"><div class="family-title"><div><h2>Familia</h2><p>${escapeHtml(cloud.family.name)}</p></div><span class="role-pill">${cloud.role==='admin'?'Administrador':'Adulto'}</span></div><div class="setting-row"><span>👤 ${escapeHtml(cloud.session.user.email||'')}</span><strong>Conectado</strong></div>${cloud.role==='admin'?`<div class="invite-box"><label>Invitar a otro adulto<input id="inviteEmail" type="email" placeholder="email@ejemplo.com"></label><button class="secondary" data-invite>Enviar invitación</button><p>La otra persona crea su cuenta con ese mismo email y KidBehaviour la unirá automáticamente a esta familia.</p></div>`:''}<button class="danger" data-logout>Cerrar sesión</button></section>${base.replace('<p>Los datos se guardan solo en este dispositivo.</p>','<p>Los datos se guardan en este dispositivo y se sincronizan con la familia.</p>')}`};
+settingsPage=function(){const base=cloudSettingsPage();if(!cloud.ready)return base;return `<section class="panel family-panel"><div class="family-title"><div><h2>Familia</h2><p>${escapeHtml(cloud.family.name)}</p></div><span class="role-pill">${cloud.role==='admin'?'Administrador':'Adulto'}</span></div><div class="setting-row"><span>👤 ${escapeHtml(cloud.session.user.email||'')}</span><strong>Conectado</strong></div>${cloud.role==='admin'?`<div class="invite-box"><label>Invitar a otro adulto<input id="inviteEmail" type="email" placeholder="email@ejemplo.com"></label><button class="secondary" data-invite>Enviar invitación</button><p>Recibirá un enlace por email. Al abrirlo, KidBehaviour lo unirá automáticamente a esta familia.</p></div>`:''}<button class="danger" data-logout>Cerrar sesión</button></section>${base.replace('<p>Los datos se guardan solo en este dispositivo.</p>','<p>Los datos se guardan en este dispositivo y se sincronizan con la familia.</p>')}`};
 const cloudWire=wire;
-wire=function(){cloudWire();document.querySelector('[data-logout]')?.addEventListener('click',logoutCloud);document.querySelector('[data-invite]')?.addEventListener('click',async()=>{const email=document.getElementById('inviteEmail').value.trim();if(!email){alert('Escribe el email de la persona que quieres invitar.');return}const {error}=await inviteAdult(email);if(error){alert(error.code==='23505'?'Ese email ya está invitado.':error.message);return}ui.toast='Invitación preparada ✓';render();setTimeout(()=>{ui.toast=null;render()},1800)})};
+wire=function(){cloudWire();document.querySelector('[data-logout]')?.addEventListener('click',logoutCloud);document.querySelector('[data-invite]')?.addEventListener('click',async()=>{const email=document.getElementById('inviteEmail').value.trim();if(!email){alert('Escribe el email de la persona que quieres invitar.');return}const button=document.querySelector('[data-invite]');button.disabled=true;button.textContent='Enviando…';const {error}=await inviteAdult(email);if(error){alert(error.message);render();return}ui.toast='Invitación enviada por email ✓';render();setTimeout(()=>{ui.toast=null;render()},2200)})};
 
 (async()=>{const {data:{session}}=await sb.auth.getSession();if(session)await startCloud(session);else authScreen();sb.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')authScreen();else if(event==='SIGNED_IN'&&session&&!cloud.ready)setTimeout(()=>startCloud(session),0)})})();
