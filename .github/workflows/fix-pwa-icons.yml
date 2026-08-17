@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'tools/fix_icons.py'
+      - 'icon-source.svg'
       - '.github/workflows/fix-pwa-icons.yml'
   workflow_dispatch:
 
@@ -19,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install pillow
+      - run: pip install cairosvg
       - run: python tools/fix_icons.py
       - name: Commit generated icons
         run: |
