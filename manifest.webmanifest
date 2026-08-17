@@ -9,7 +9,8 @@
   "background_color": "#f4f4f1",
   "theme_color": "#f4f4f1",
   "icons": [
-    {"src":"/kidBehaviour/icon-192-v2.png","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"/kidBehaviour/apple-touch-icon-v2.png","sizes":"180x180","type":"image/png","purpose":"any"}
+    {"src":"/kidBehaviour/icon-192-fixed.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"/kidBehaviour/icon-512-fixed.png","sizes":"512x512","type":"image/png","purpose":"any maskable"},
+    {"src":"/kidBehaviour/apple-touch-icon-fixed.png","sizes":"180x180","type":"image/png","purpose":"any"}
   ]
 }
