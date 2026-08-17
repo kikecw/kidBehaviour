@@ -20,6 +20,18 @@ async function authAction(kind){
 }
 function localSnapshot(){return JSON.parse(JSON.stringify(state))}
 function snapshotString(){try{return JSON.stringify(state)}catch{return''}}
+function migratePrivilegeTiers(){
+  if(typeof BASIC_PRIVILEGES==='undefined')return false;
+  let changed=false;
+  const basicIds=new Set(BASIC_PRIVILEGES.map(p=>p.id));
+  const wantedBasics=BASIC_PRIVILEGES.map(p=>({...p,active:true}));
+  if(JSON.stringify(state.privileges)!==JSON.stringify(wantedBasics)){state.privileges=wantedBasics;changed=true}
+  if(typeof BLUE_PRIVILEGES!=='undefined'&&JSON.stringify(state.bluePrivileges)!==JSON.stringify(BLUE_PRIVILEGES)){state.bluePrivileges=BLUE_PRIVILEGES.map(p=>({...p}));changed=true}
+  if(typeof GOLD_PRIVILEGES!=='undefined'&&JSON.stringify(state.goldPrivileges)!==JSON.stringify(GOLD_PRIVILEGES)){state.goldPrivileges=GOLD_PRIVILEGES.map(p=>({...p}));changed=true}
+  Object.values(state.days||{}).forEach(d=>{const lost=(d.lostPrivileges||[]).filter(id=>basicIds.has(id));if(JSON.stringify(lost)!==JSON.stringify(d.lostPrivileges||[])){d.lostPrivileges=lost;changed=true}if(!Array.isArray(d.earnedPrivileges)){d.earnedPrivileges=[];changed=true}});
+  localStorage.setItem(PRIVILEGE_SETTINGS_KEY,JSON.stringify(state.privileges));
+  return changed;
+}
 async function startCloud(session){
   cloud.session=session;
   if(!session){cloud.ready=false;authScreen();return}
@@ -36,8 +48,9 @@ async function startCloud(session){
     const member=members[0];cloud.role=member.role;
     const {data:fam,error:fe}=await sb.from('families').select('id,name').eq('id',member.family_id).single();if(fe)throw fe;cloud.family=fam;
     const {data:remote,error:re}=await sb.from('family_state').select('state,version').eq('family_id',fam.id).single();if(re)throw re;
-    if(remote?.state&&Object.keys(remote.state).length){state=remote.state;state.children=state.children?.length?state.children:CHILDREN;state.privileges=state.privileges?.length?state.privileges:PRIVILEGES;state.days||={};state.rewards||=[];state.restrictions||=[];localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(PRIVILEGE_SETTINGS_KEY,JSON.stringify(state.privileges));cloud.lastRemoteVersion=remote.version||1}
-    cloud.lastSnapshot=snapshotString();cloud.ready=true;subscribeFamily();render();
+    let migrated=false;
+    if(remote?.state&&Object.keys(remote.state).length){state=remote.state;state.children=state.children?.length?state.children:CHILDREN;state.days||={};state.rewards||=[];state.restrictions||=[];migrated=migratePrivilegeTiers();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));cloud.lastRemoteVersion=remote.version||1}
+    cloud.lastSnapshot=snapshotString();cloud.ready=true;subscribeFamily();render();if(migrated)await pushCloudState();
   }catch(e){console.error(e);authScreen(`No se pudo preparar la sincronización: ${e.message}`)}
 }
 async function pushCloudState(){
@@ -47,7 +60,7 @@ async function pushCloudState(){
 }
 function subscribeFamily(){
   if(cloud.channel)sb.removeChannel(cloud.channel);
-  cloud.channel=sb.channel(`family:${cloud.family.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'family_state',filter:`family_id=eq.${cloud.family.id}`},payload=>{const row=payload.new;if(!row||row.updated_by===cloud.session.user.id||row.version<=cloud.lastRemoteVersion)return;cloud.lastRemoteVersion=row.version;state=row.state;state.children=state.children?.length?state.children:CHILDREN;state.privileges=state.privileges?.length?state.privileges:PRIVILEGES;state.days||={};state.rewards||=[];state.restrictions||=[];localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(PRIVILEGE_SETTINGS_KEY,JSON.stringify(state.privileges));cloud.lastSnapshot=snapshotString();render()}).subscribe();
+  cloud.channel=sb.channel(`family:${cloud.family.id}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'family_state',filter:`family_id=eq.${cloud.family.id}`},payload=>{const row=payload.new;if(!row||row.updated_by===cloud.session.user.id||row.version<=cloud.lastRemoteVersion)return;cloud.lastRemoteVersion=row.version;state=row.state;state.children=state.children?.length?state.children:CHILDREN;state.days||={};state.rewards||=[];state.restrictions||=[];migratePrivilegeTiers();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));cloud.lastSnapshot=snapshotString();render()}).subscribe();
 }
 async function inviteAdult(email){
   if(cloud.role!=='admin')return {error:new Error('Solo un administrador puede invitar adultos.')};
